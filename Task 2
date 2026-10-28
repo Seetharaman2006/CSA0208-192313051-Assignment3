@@ -1,0 +1,96 @@
+#include <stdio.h>
+#include <limits.h>
+
+#define SAMPLE_BILL_RUPEES 500.00
+#define SAMPLE_BILL_PAISE 50000LL
+
+int main(void)
+{
+    long long households[] = {4000LL, 60000LL, 800000LL};
+    int count = 3;
+
+    printf("============================================\n");
+    printf(" TASK 2: COMPARE EXPECTATIONS WITH EXECUTION\n");
+    printf("============================================\n");
+
+    printf("\n1. DATA TYPE LIMITS\n");
+    printf("INT_MAX   : %d\n", INT_MAX);
+    printf("LONG_MAX  : %ld\n", LONG_MAX);
+    printf("LLONG_MAX : %lld\n", LLONG_MAX);
+
+    printf("\n2. HOUSEHOLD BILL TOTALS\n");
+    printf("Sample bill per household: Rs. %.2f\n",
+           SAMPLE_BILL_RUPEES);
+
+    printf("%-15s %-22s %-22s\n",
+           "Households", "Total (Rupees)", "Total (Paise)");
+
+    printf("-----------------------------------------------------------\n");
+
+    for (int i = 0; i < count; i++)
+    {
+        long long n = households[i];
+
+        long long totalPaise = n * SAMPLE_BILL_PAISE;
+        long long totalRupees = totalPaise / 100;
+
+        printf("%-15lld %-22lld %-22lld\n",
+               n, totalRupees, totalPaise);
+    }
+
+    printf("\n3. FLOATING-POINT VS INTEGER-PAISE TOTALS\n");
+
+    double doubleTotal = 0.0;
+    float floatTotal = 0.0f;
+    long long integerPaiseTotal = 0;
+
+    for (int i = 0; i < 800000; i++)
+    {
+        doubleTotal += SAMPLE_BILL_RUPEES;
+        floatTotal += SAMPLE_BILL_RUPEES;
+        integerPaiseTotal += SAMPLE_BILL_PAISE;
+    }
+
+    printf("Float total   : Rs. %.2f\n", (double)floatTotal);
+    printf("Double total  : Rs. %.2f\n", doubleTotal);
+
+    printf("Integer total : Rs. %lld.%02lld\n",
+           integerPaiseTotal / 100,
+           integerPaiseTotal % 100);
+
+    printf("\n4. INTEGER OVERFLOW CHECK\n");
+
+    long long districtPaise =
+        800000LL * SAMPLE_BILL_PAISE;
+
+    printf("District total in paise: %lld\n", districtPaise);
+
+    if (districtPaise > INT_MAX)
+    {
+        printf("Result: int cannot store this positive total.\n");
+    }
+    else
+    {
+        printf("Result: int can store this positive total.\n");
+    }
+
+    if (districtPaise <= LLONG_MAX)
+    {
+        printf("Result: long long can store this positive total.\n");
+    }
+    else
+    {
+        printf("Result: long long cannot store this positive total.\n");
+    }
+
+    printf("\n5. EXPECTATION VS OBSERVATION\n");
+
+    printf("Expected district total: Rs. 400000000.00\n");
+    printf("Integer-paise result   : Rs. %lld.%02lld\n",
+           integerPaiseTotal / 100,
+           integerPaiseTotal % 100);
+
+    printf("\nAnalysis completed successfully.\n");
+
+    return 0;
+}
