@@ -1,0 +1,202 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_READINGS 35040
+#define LINE_SIZE 128
+
+typedef struct {
+    double fixed_charge;
+    long long rate1_paise;
+    long long rate2_paise;
+    double peak_multiplier;
+    long long slab1;
+    long long slab2;
+} Tariff;
+
+typedef struct {
+    char date[11];
+    char time[6];
+    long long energy_wh;
+} Reading;
+
+/* Load tariff settings from tariff.cfg */
+int load_tariff(Tariff *t) {
+    FILE *file = fopen("tariff.cfg", "r");
+
+    if (file == NULL) {
+        printf("Error: Cannot open tariff.cfg\n");
+        return 0;
+    }
+
+    double rate1_rupees, rate2_rupees;
+
+    if (fscanf(file, "%lf %lf %lf %lf %lld %lld",
+               &t->fixed_charge,
+               &rate1_rupees,
+               &rate2_rupees,
+               &t->peak_multiplier,
+               &t->slab1,
+               &t->slab2) != 6) {
+        printf("Error: Invalid tariff.cfg format\n");
+        fclose(file);
+        return 0;
+    }
+
+    fclose(file);
+
+    if (t->fixed_charge < 0 ||
+        rate1_rupees < 0 ||
+        rate2_rupees < 0 ||
+        t->peak_multiplier < 1.0 ||
+        t->slab1 < 0 ||
+        t->slab2 <= t->slab1) {
+        printf("Error: Invalid tariff values\n");
+        return 0;
+    }
+
+    t->rate1_paise = (long long)(rate1_rupees * 100.0 + 0.5);
+    t->rate2_paise = (long long)(rate2_rupees * 100.0 + 0.5);
+
+    return 1;
+}
+
+/* Check whether a reading falls between 6 PM and 10 PM */
+int is_peak_hour(const char *time) {
+    int hour, minute;
+
+    if (sscanf(time, "%d:%d", &hour, &minute) != 2) {
+        return 0;
+    }
+
+    return hour >= 18 && hour < 22;
+}
+
+/* Calculate energy charge in paise.
+   Consumption is measured in Wh; 1000 Wh = 1 kWh. */
+long long calculate_charge(long long previous_wh,
+                           long long interval_wh,
+                           int peak,
+                           const Tariff *t) {
+    long long end_wh = previous_wh + interval_wh;
+    long long limit1 = t->slab1 * 1000;
+    long long limit2 = t->slab2 * 1000;
+    long long charge = 0;
+    long long lower, upper;
+
+    /* First slab: free */
+    (void)limit1;
+
+    /* Second slab */
+    lower = previous_wh > limit1 ? previous_wh : limit1;
+    upper = end_wh < limit2 ? end_wh : limit2;
+
+    if (upper > lower) {
+        charge += ((upper - lower) * t->rate1_paise) / 1000;
+    }
+
+    /* Third slab */
+    lower = previous_wh > limit2 ? previous_wh : limit2;
+    upper = end_wh;
+
+    if (upper > lower) {
+        charge += ((upper - lower) * t->rate2_paise) / 1000;
+    }
+
+    if (peak) {
+        charge = (long long)(charge * t->peak_multiplier + 0.5);
+    }
+
+    return charge;
+}
+
+int main(void) {
+    Tariff tariff;
+    Reading reading;
+    FILE *file;
+    char line[LINE_SIZE];
+
+    long long total_wh = 0;
+    long long peak_wh = 0;
+    long long offpeak_wh = 0;
+    long long energy_charge_paise = 0;
+    int reading_count = 0;
+
+    if (!load_tariff(&tariff)) {
+        return 1;
+    }
+
+    file = fopen("readings.csv", "r");
+
+    if (file == NULL) {
+        printf("Error: Cannot open readings.csv\n");
+        return 1;
+    }
+
+    while (fgets(line, sizeof(line), file) != NULL) {
+        if (reading_count >= MAX_READINGS) {
+            printf("Error: Too many readings\n");
+            fclose(file);
+            return 1;
+        }
+
+        if (sscanf(line, "%10[^,],%5[^,],%lld",
+                   reading.date,
+                   reading.time,
+                   &reading.energy_wh) != 3) {
+            printf("Warning: Skipping invalid row: %s", line);
+            continue;
+        }
+
+        if (reading.energy_wh < 0) {
+            printf("Error: Negative energy reading found\n");
+            fclose(file);
+            return 1;
+        }
+
+        if (reading.energy_wh > 0 &&
+            total_wh > 9000000000000000LL - reading.energy_wh) {
+            printf("Error: Consumption total is too large\n");
+            fclose(file);
+            return 1;
+        }
+
+        int peak = is_peak_hour(reading.time);
+
+        energy_charge_paise += calculate_charge(
+            total_wh, reading.energy_wh, peak, &tariff
+        );
+
+        total_wh += reading.energy_wh;
+
+        if (peak) {
+            peak_wh += reading.energy_wh;
+        } else {
+            offpeak_wh += reading.energy_wh;
+        }
+
+        reading_count++;
+    }
+
+    fclose(file);
+
+    printf("\n====================================\n");
+    printf("   GRAMA JYOTHI SMART METER BILL\n");
+    printf("====================================\n");
+    printf("Number of readings : %d\n", reading_count);
+    printf("Total consumption : %.3f kWh\n", total_wh / 1000.0);
+    printf("Peak consumption  : %.3f kWh\n", peak_wh / 1000.0);
+    printf("Off-peak consumption: %.3f kWh\n",
+           offpeak_wh / 1000.0);
+    printf("Fixed charge      : Rs. %.2f\n",
+           tariff.fixed_charge);
+    printf("Energy charge     : Rs. %.2f\n",
+           energy_charge_paise / 100.0);
+    printf("------------------------------------\n");
+    printf("TOTAL BILL        : Rs. %.2f\n",
+           tariff.fixed_charge + energy_charge_paise / 100.0);
+    printf("====================================\n");
+
+    return 0;
+}
