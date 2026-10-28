@@ -1,0 +1,146 @@
+
+#include <stdio.h>
+
+#define MAX_READING 65535
+#define FIXED_CHARGE_PAISE 5000LL
+#define SLAB_COUNT 3
+
+/*
+   Slab limits:
+   0 - 100 units       : Free
+   101 - 200 units     : Rs. 2.25 per unit
+   Above 200 units     : Rs. 4.50 per unit
+*/
+
+const long long slabLimits[SLAB_COUNT] = {
+    100LL,
+    200LL,
+    9223372036854775807LL
+};
+
+const long long slabRatesPaise[SLAB_COUNT] = {
+    0LL,
+    225LL,
+    450LL
+};
+
+/* Validate meter readings and calculate consumption. */
+long long calculateUnits(int previous, int current)
+{
+    if (previous < 0 || previous > MAX_READING ||
+        current < 0 || current > MAX_READING)
+    {
+        return -1;
+    }
+
+    if (current >= previous)
+    {
+        return (long long)current - previous;
+    }
+
+    /* Handle rollover from 65535 to 0. */
+    if (previous == MAX_READING && current == 0)
+    {
+        return 1;
+    }
+
+    return -1;
+}
+
+/* Calculate energy charges using the tariff slab arrays. */
+long long calculateEnergyCharge(long long units)
+{
+    long long charge = 0;
+    long long lowerLimit = 0;
+
+    for (int i = 0; i < SLAB_COUNT; i++)
+    {
+        if (units <= lowerLimit)
+        {
+            break;
+        }
+
+        long long upperLimit = slabLimits[i];
+        long long slabUnits;
+
+        if (units < upperLimit)
+        {
+            slabUnits = units - lowerLimit;
+        }
+        else
+        {
+            slabUnits = upperLimit - lowerLimit;
+        }
+
+        charge += slabUnits * slabRatesPaise[i];
+
+        if (units <= upperLimit)
+        {
+            break;
+        }
+
+        lowerLimit = upperLimit;
+    }
+
+    return charge;
+}
+
+/* Display currency stored as integer paise. */
+void displayAmount(const char *label, long long paise)
+{
+    printf("%-20s Rs. %lld.%02lld\n",
+           label, paise / 100, paise % 100);
+}
+
+int main(void)
+{
+    int previous, current;
+    long long units;
+    long long energyCharge;
+    long long totalBill;
+
+    printf("========================================\n");
+    printf("     GRAMA JYOTHI BILLING SYSTEM\n");
+    printf("========================================\n");
+
+    printf("Enter previous meter reading: ");
+
+    if (scanf("%d", &previous) != 1)
+    {
+        printf("Error: Invalid previous reading.\n");
+        return 1;
+    }
+
+    printf("Enter current meter reading: ");
+
+    if (scanf("%d", &current) != 1)
+    {
+        printf("Error: Invalid current reading.\n");
+        return 1;
+    }
+
+    units = calculateUnits(previous, current);
+
+    if (units < 0)
+    {
+        printf("Error: Invalid meter readings or rollover.\n");
+        return 1;
+    }
+
+    energyCharge = calculateEnergyCharge(units);
+    totalBill = FIXED_CHARGE_PAISE + energyCharge;
+
+    printf("\n============== BILL DETAILS ==============\n");
+
+    printf("Previous reading    : %d\n", previous);
+    printf("Current reading     : %d\n", current);
+    printf("Units consumed      : %lld\n", units);
+
+    displayAmount("Fixed charge", FIXED_CHARGE_PAISE);
+    displayAmount("Energy charge", energyCharge);
+    displayAmount("Total bill", totalBill);
+
+    printf("==========================================\n");
+
+    return 0;
+}
