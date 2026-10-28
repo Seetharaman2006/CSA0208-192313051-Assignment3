@@ -1,0 +1,109 @@
+
+#include <stdio.h>
+
+#define MAX_READING 65535
+#define FIXED_CHARGE_PAISE 5000LL
+#define SLAB1_LIMIT 100LL
+#define SLAB2_LIMIT 200LL
+#define RATE1_PAISE 225LL
+#define RATE2_PAISE 450LL
+
+long long calculateUnits(int previous, int current)
+{
+    if (current >= previous)
+    {
+        return (long long)current - previous;
+    }
+
+    /* Handle the specified rollover from 65535 to 0. */
+    if (previous == MAX_READING && current == 0)
+    {
+        return 1;
+    }
+
+    return -1;
+}
+
+long long calculateBillPaise(long long units)
+{
+    long long energyCharge;
+
+    if (units <= SLAB1_LIMIT)
+    {
+        energyCharge = 0;
+    }
+    else if (units <= SLAB2_LIMIT)
+    {
+        energyCharge =
+            (units - SLAB1_LIMIT) * RATE1_PAISE;
+    }
+    else
+    {
+        energyCharge =
+            (SLAB2_LIMIT - SLAB1_LIMIT) * RATE1_PAISE
+            + (units - SLAB2_LIMIT) * RATE2_PAISE;
+    }
+
+    return FIXED_CHARGE_PAISE + energyCharge;
+}
+
+void printRupees(const char *label, long long paise)
+{
+    printf("%-20s Rs. %lld.%02lld\n",
+           label, paise / 100, paise % 100);
+}
+
+int main(void)
+{
+    int previous, current;
+    long long units, bill;
+
+    printf("=== GRAMA JYOTHI BILLING SYSTEM ===\n");
+
+    printf("Enter previous meter reading: ");
+
+    if (scanf("%d", &previous) != 1)
+    {
+        printf("Error: Invalid previous reading.\n");
+        return 1;
+    }
+
+    printf("Enter current meter reading: ");
+
+    if (scanf("%d", &current) != 1)
+    {
+        printf("Error: Invalid current reading.\n");
+        return 1;
+    }
+
+    if (previous < 0 || previous > MAX_READING ||
+        current < 0 || current > MAX_READING)
+    {
+        printf("Error: Readings must be between 0 and 65535.\n");
+        return 1;
+    }
+
+    units = calculateUnits(previous, current);
+
+    if (units < 0)
+    {
+        printf("Error: Invalid meter rollover.\n");
+        return 1;
+    }
+
+    bill = calculateBillPaise(units);
+
+    printf("\n========== BILL DETAILS ==========\n");
+    printf("Previous reading    : %d\n", previous);
+    printf("Current reading     : %d\n", current);
+    printf("Units consumed      : %lld\n", units);
+
+    printRupees("Fixed charge", FIXED_CHARGE_PAISE);
+    printRupees("Energy charge",
+                bill - FIXED_CHARGE_PAISE);
+    printRupees("Total bill", bill);
+
+    printf("==================================\n");
+
+    return 0;
+}
